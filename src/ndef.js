@@ -451,3 +451,46 @@ NDEF.prototype.compose_RTD_URI = function(uri) {
                         UTIL_StringToBytes(uri.substring(longest))));
 }
 
+
+/**
+* parseBytes - Parses a Uint8Array array of bytes from NDEF 
+*
+* This is largely a shortcut method to handle the fact that the raw 
+* ArrayBuffer read in this method isn't so happy with the NDEF data 
+* produced throught Android and the HCE.
+*
+* This is likely a misunderstanding on my part (and I haven't looked into 
+* this further) so if you see this method and thing "yep, I'll use this", 
+* please don't as I will go back and resolve the issue and make this method 
+* vanish.
+*
+**/
+NDEF.prototype.parseBytes = function(bytes) {
+
+  //
+  // Brave or foolish? Foolish.
+  //
+  // No checks, just pure, I'll-read-hex-in-devtools-and-verify blasphamy
+  //
+  var MB = UTIL_BytesToHex(new Uint8Array(bytes.subarray(0, 1)));
+  var ME = UTIL_BytesToHex(new Uint8Array(bytes.subarray(2, 3)));
+  var CF = UTIL_BytesToHex(new Uint8Array(bytes.subarray(3, 4)));
+  var SR = UTIL_BytesToHex(new Uint8Array(bytes.subarray(4, 5)));
+  var IL = UTIL_BytesToHex(new Uint8Array(bytes.subarray(5, 6)));
+  var TNF = UTIL_BytesToHex(new Uint8Array(bytes.subarray(6, 7)));
+  var id = UTIL_BytesToHex(new Uint8Array(bytes.subarray(7, 9)));
+  var payload = UTIL_BytesToString(new Uint8Array(bytes.subarray(9, bytes.length-2)));
+  
+  console.groupCollapsed("Parsing NDEF Bytes")
+  console.log("MB: " + MB);
+  console.log("ME: " + ME);
+  console.log("SR: " + SR);
+  console.log("IL: " + IL);
+  console.log("TNF: " + TNF);
+  console.log("ID: " + id);
+  console.log("payload: " + payload);
+  console.groupEnd();
+
+  return payload;
+};
+

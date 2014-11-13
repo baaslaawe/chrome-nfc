@@ -47,6 +47,70 @@ function NFC() {
     });
   }
 
+  var APDU_SELECT = new Uint8Array([
+    0x00, // CLA  - Class - Class of instruction
+    0xA4, // INS  - Instruction - Instruction code
+    0x04, // P1 - Parameter 1 - Instruction parameter 1
+    0x00, // P2 - Parameter 2 - Instruction parameter 2
+    0x07, // Lc field - Number of bytes present in the data field of the command
+    0xF0, 0x39, 0x41, 0x48, 0x14, 0x81, 0x00, // NDEF Tag Application name
+    0x00  // Le field - Maximum number of bytes expected in the data field of the response to the command
+  ]);
+
+  var CAPABILITY_CONTAINER = new Uint8Array([
+    0x00, // CLA  - Class - Class of instruction
+    0xa4, // INS  - Instruction - Instruction code
+    0x00, // P1 - Parameter 1 - Instruction parameter 1
+    0x0c, // P2 - Parameter 2 - Instruction parameter 2
+    0x02, // Lc field - Number of bytes present in the data field of the command
+    0xe1, 0x03 // file identifier of the CC file
+  ]);
+
+  var READ_CAPABILITY_CONTAINER = new Uint8Array([
+    0x00, // CLA  - Class - Class of instruction
+    0xb0, // INS  - Instruction - Instruction code
+    0x00, // P1 - Parameter 1 - Instruction parameter 1
+    0x00, // P2 - Parameter 2 - Instruction parameter 2
+    0x0f  // Lc field - Number of bytes present in the data field of the command
+  ]);
+
+  var READ_CAPABILITY_CONTAINER_RESPONSE = new Uint8Array([
+    0x00, 0x0F, // CCLEN length of the CC file
+    0x20, // Mapping Version 2.0
+    0x00, 0x3B, // MLe maximum 59 bytes R-APDU data size
+    0x00, 0x34, // MLc maximum 52 bytes C-APDU data size
+    0x04, // T field of the NDEF File Control TLV
+    0x06, // L field of the NDEF File Control TLV
+    0xE1, 0x04, // File Identifier of NDEF file
+    0x00, 0x32, // Maximum NDEF file size of 50 bytes
+    0x00, // Read access without any security
+    0x00, // Write access without any security
+    0x90, 0x00 // A_OKAY
+  ]);
+
+  var NDEF_SELECT = new Uint8Array([
+    0x00, // CLA  - Class - Class of instruction
+    0xa4, // Instruction byte (INS) for Select command
+    0x00, // Parameter byte (P1), select by identifier
+    0x0c, // Parameter byte (P1), select by identifier
+    0x02, // Lc field - Number of bytes present in the data field of the command
+    0xE1, 0x04 // file identifier of the NDEF file retrieved from the CC file
+  ]);
+
+  var NDEF_READ_BINARY_NLEN = new Uint8Array([
+    0x00, // Class byte (CLA)
+    0xb0, // Instruction byte (INS) for ReadBinary command
+    0x00, 0x00, // Parameter byte (P1, P2), offset inside the CC file
+    0x02  // Le field
+  ]);
+
+  var NDEF_READ_BINARY_GET_NDEF = new Uint8Array([
+    0x00, // Class byte (CLA)
+    0xb0, // Instruction byte (INS) for ReadBinary command
+    0x00, 0x00, // Parameter byte (P1, P2), offset inside the CC file
+    0x0f  //  Le field
+  ]);
+
   var pub = {
     /*
      *  This function is to get use-able NFC device(s).
@@ -264,6 +328,54 @@ function NFC() {
           cb(rc);
         });
       }, timeout);
+    },
+
+    /**
+    * conversation - Having a conversation with an Android HCE
+    *
+    * This is similar to usbSCL3711.prototype.apdu(), slightly modified to
+    * handle specific command > response for my Type 4 demo 
+    *   
+    * @param {handle}     device    Device handle (i.e. our NFC reader) 
+    * @param {array}      options   Dictionary of parameter options.
+    * @param {function}   callback  Our callback function
+    * @param {integer}    step      The command sequence step (for my sanity)
+    **/  
+    "conversation": function(device, options, callback) {
+      
+      //
+      // The following flow is based on Appendix E "Example of Mapping 
+      // Version 2.0 Command Flow" in the NFC Forum specification
+      //
+
+      //
+      // Step is basically the command we want to send
+      //
+      var step = options["step"];
+    
+      if (step === 0) {      
+        device.sendCommand(APDU_SELECT, callback, false, step);
+      }
+      
+      if (step === 1) {      
+        device.sendCommand(CAPABILITY_CONTAINER, callback, false, step);
+      }
+      
+      if (step === 2) {       
+        device.sendCommand(READ_CAPABILITY_CONTAINER, callback, false, step);
+      }
+      
+      if (step === 3) {        
+        device.sendCommand(NDEF_SELECT, callback, false. step);
+      }
+      
+      if (step === 4) {        
+        device.sendCommand(NDEF_READ_BINARY_NLEN, callback, false, step);
+      }
+      
+      if (step === 5) {       
+        device.sendCommand(NDEF_READ_BINARY_GET_NDEF, callback, false, step);
+      }
     }
   };
 
