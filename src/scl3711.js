@@ -374,7 +374,7 @@ usbSCL3711.prototype.acr122_authentication = function(block, loc, type, cb) {
           0x01,  /* Version */
           0x00,  /* 0x00 */
           block, /* Block number */
-          type,  /* Key type: TYPE A (0x60) or TYPE B (0x61) */ 
+          type,  /* Key type: TYPE A (0x60) or TYPE B (0x61) */
           loc    /* Key number (key location): 0 or 1 */
           ]).buffer, 1.0, function(rc, data) {
     console.log("[DEBUG] acr122_authentication(loc: " + loc +
@@ -798,13 +798,29 @@ usbSCL3711.prototype.apdu = function(req, cb, write_only) {
   }
 };
 
+//
+// From API-ACR122U-2.02
+//
+//
+//
+usbSCL3711.prototype.acr122_get_current_settings = function(cb) {
+  var self = this;
+  var callback = cb;
+
+  self.exchange(new Uint8Array([
+    0x6b, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xff, 0x00, 0x00, 0x00, 0x02, 0xd4, 0x02]).buffer, 1.0, function(rc, data) {
+      if (callback) callback(rc, data);
+  });
+};
+
 /**
 * sendCommand - Write specific frames to the wire and read response
 *
 * This is similar to usbSCL3711.prototype.apdu(), slightly modified to
-* handle specific command > response for my Type 4 demo 
-*   
-* @param {Uint8Array} command   What we want to send (i.e. SELECT APDU) 
+* handle specific command > response for my Type 4 demo
+*
+* @param {Uint8Array} command   What we want to send (i.e. SELECT APDU)
 * @param {function}   callback  Our callback function
 * @param {boolean}    check     Reserved
 * @param {integer}    step      The command sequence step (for my sanity)
@@ -817,14 +833,14 @@ usbSCL3711.prototype.sendCommand = function(command, callback, check, step) {
   }
   
   //
-  // TODO shortened read timeout, revisit 
+  // TODO shortened read timeout, revisit
   //
   this.read(1, function(rc, data, expect_sw12) {
     var u8 = new Uint8Array(data);
     var message = "";
     
     //
-    // TODO this shouldn't be here, but for the sake of testing, let's roll! 
+    // TODO this shouldn't be here, but for the sake of testing, let's roll!
     // TODO could just read the buffer :-)
     if (step === 5) {
       var parseNdefData = new NDEF;

@@ -588,6 +588,26 @@ NDEF.prototype.compose_RTD_URI = function(uri) {
   }
   return new Uint8Array([longest_i].concat(UTIL_StringToBytes(uri.substring(longest))));
 };
+NDEF.prototype.parseBytes = function(bytes) {
+  var MB = UTIL_BytesToHex(new Uint8Array(bytes.subarray(0, 1)));
+  var ME = UTIL_BytesToHex(new Uint8Array(bytes.subarray(2, 3)));
+  var CF = UTIL_BytesToHex(new Uint8Array(bytes.subarray(3, 4)));
+  var SR = UTIL_BytesToHex(new Uint8Array(bytes.subarray(4, 5)));
+  var IL = UTIL_BytesToHex(new Uint8Array(bytes.subarray(5, 6)));
+  var TNF = UTIL_BytesToHex(new Uint8Array(bytes.subarray(6, 7)));
+  var id = UTIL_BytesToHex(new Uint8Array(bytes.subarray(7, 9)));
+  var payload = UTIL_BytesToString(new Uint8Array(bytes.subarray(9, bytes.length - 2)));
+  console.groupCollapsed("Parsing NDEF Bytes");
+  console.log("MB: " + MB);
+  console.log("ME: " + ME);
+  console.log("SR: " + SR);
+  console.log("IL: " + IL);
+  console.log("TNF: " + TNF);
+  console.log("ID: " + id);
+  console.log("payload: " + payload);
+  console.groupEnd();
+  return payload;
+};
 function NFC() {
   var self = this;
   function construct_ndef_obj(ndef_array) {
@@ -611,6 +631,13 @@ function NFC() {
       cb(rc, tag_type, tag_id);
     });
   }
+  var APDU_SELECT = new Uint8Array([0, 164, 4, 0, 7, 240, 57, 65, 72, 20, 129, 0, 0]);
+  var CAPABILITY_CONTAINER = new Uint8Array([0, 164, 0, 12, 2, 225, 3]);
+  var READ_CAPABILITY_CONTAINER = new Uint8Array([0, 176, 0, 0, 15]);
+  var READ_CAPABILITY_CONTAINER_RESPONSE = new Uint8Array([0, 15, 32, 0, 59, 0, 52, 4, 6, 225, 4, 0, 50, 0, 0, 144, 0]);
+  var NDEF_SELECT = new Uint8Array([0, 164, 0, 12, 2, 225, 4]);
+  var NDEF_READ_BINARY_NLEN = new Uint8Array([0, 176, 0, 0, 2]);
+  var NDEF_READ_BINARY_GET_NDEF = new Uint8Array([0, 176, 0, 0, 15]);
   var pub = {"findDevices":function(cb) {
     var device = new usbSCL3711;
     window.setTimeout(function() {
@@ -735,6 +762,26 @@ function NFC() {
         cb(rc);
       });
     }, timeout);
+  }, "conversation":function(device, options, callback) {
+    var step = options["step"];
+    if (step === 0) {
+      device.sendCommand(APDU_SELECT, callback, false, step);
+    }
+    if (step === 1) {
+      device.sendCommand(CAPABILITY_CONTAINER, callback, false, step);
+    }
+    if (step === 2) {
+      device.sendCommand(READ_CAPABILITY_CONTAINER, callback, false, step);
+    }
+    if (step === 3) {
+      device.sendCommand(NDEF_SELECT, callback, false.step);
+    }
+    if (step === 4) {
+      device.sendCommand(NDEF_READ_BINARY_NLEN, callback, false, step);
+    }
+    if (step === 5) {
+      device.sendCommand(NDEF_READ_BINARY_GET_NDEF, callback, false, step);
+    }
   }};
   return pub;
 }
@@ -1485,6 +1532,35 @@ usbSCL3711.prototype.apdu = function(req, cb, write_only) {
       }
     });
   }
+};
+usbSCL3711.prototype.acr122_get_current_settings = function(cb) {
+  var self = this;
+  var callback = cb;
+  self.exchange((new Uint8Array([107, 5, 0, 0, 0, 0, 0, 0, 0, 0, 255, 0, 0, 0, 2, 212, 2])).buffer, 1, function(rc, data) {
+    if (callback) {
+      callback(rc, data);
+    }
+  });
+};
+usbSCL3711.prototype.sendCommand = function(command, callback, check, step) {
+  var u8 = new Uint8Array(this.makeFrame(64, UTIL_concat([1], command)));
+  for (var i = 0;i < u8.length;i += 64) {
+    this.dev.writeFrame((new Uint8Array(u8.subarray(i, i + 64))).buffer);
+  }
+  this.read(1, function(rc, data, expect_sw12) {
+    var u8 = new Uint8Array(data);
+    var message = "";
+    if (step === 5) {
+      var parseNdefData = new NDEF;
+      message = parseNdefData.parseBytes(u8);
+    }
+    if (u8.length < 2 || u8[u8.length - 2] !== 144 || u8[u8.length - 1] !== 0) {
+      console.log("JDR: something is not right on that return!");
+    } else {
+      callback(UTIL_BytesToHexWithSeparator(u8), u8, message, true);
+      return;
+    }
+  });
 };
 function SHA256() {
   this._buf = new Array(64);
